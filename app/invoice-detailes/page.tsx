@@ -1,5 +1,5 @@
 "use client";
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, Suspense } from 'react';
 import { ArrowLeft, Save, Plus, Trash2, Loader2 } from 'lucide-react';
 import ProtectedRoute from '@/component/ProtectedRoute';
 import { useDispatch, useSelector } from 'react-redux';
@@ -17,7 +17,7 @@ interface LineItem {
   amount: number;
 }
 
-const InvoiceDetailPage: React.FC = () => {
+const InvoiceDetailPageContent: React.FC = () => {
   const router = useRouter();
   const searchParams = useSearchParams();
   const invoiceId = searchParams.get('id');
@@ -582,6 +582,18 @@ const InvoiceDetailPage: React.FC = () => {
       </div>
       </div>
     </ProtectedRoute>
+  );
+};
+
+const InvoiceDetailPage: React.FC = () => {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <Loader2 className="w-8 h-8 text-gray-400 animate-spin" />
+      </div>
+    }>
+      <InvoiceDetailPageContent />
+    </Suspense>
   );
 };
 
