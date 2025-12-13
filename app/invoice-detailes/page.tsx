@@ -43,6 +43,14 @@ const InvoiceDetailPage: React.FC = () => {
   });
   const [saving, setSaving] = useState(false);
   const [imageUrl, setImageUrl] = useState<string | null>(null);
+  const [isMounted, setIsMounted] = useState(false);
+  const [isClient, setIsClient] = useState(false);
+
+  // Track if component is mounted (client-side only)
+  useEffect(() => {
+    setIsMounted(true);
+    setIsClient(true);
+  }, []);
 
   // Cleanup blob URL on unmount
   useEffect(() => {
@@ -52,8 +60,6 @@ const InvoiceDetailPage: React.FC = () => {
       }
     };
   }, [imageUrl]);
-
-  const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
   useEffect(() => {
     if (invoiceId) {
@@ -97,8 +103,9 @@ const InvoiceDetailPage: React.FC = () => {
         setLineItems([]);
       }
 
-      // Load image if available
-      if (currentInvoice.image_path) {
+      // Load image if available (only on client-side)
+      if (currentInvoice.image_path && isMounted && typeof window !== 'undefined') {
+        const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
         const token = localStorage.getItem('access_token');
         // Fetch image with auth token and convert to blob URL
         fetch(`${API_BASE_URL}/api/invoices/${invoiceId}/image`, {
@@ -120,11 +127,11 @@ const InvoiceDetailPage: React.FC = () => {
             console.error('Error loading image:', error);
             setImageUrl(null);
           });
-      } else {
+      } else if (!currentInvoice.image_path) {
         setImageUrl(null);
       }
     }
-  }, [currentInvoice, invoiceId, API_BASE_URL]);
+  }, [currentInvoice, invoiceId, isMounted]);
 
   const calculateSubtotal = () => {
     return lineItems.reduce((sum, item) => sum + item.amount, 0);
@@ -138,8 +145,9 @@ const InvoiceDetailPage: React.FC = () => {
   };
 
   const addLineItem = () => {
+    // Use a more stable ID generation that works on both server and client
     const newItem: LineItem = {
-      id: Date.now().toString(),
+      id: `item-${lineItems.length}-${Math.random().toString(36).substr(2, 9)}`,
       description: '',
       qty: 1,
       rate: 0,
@@ -259,6 +267,7 @@ const InvoiceDetailPage: React.FC = () => {
     return null;
   }
 
+  // Define status options outside render to avoid hydration issues
   const statusOptions = [
     'Pending Review',
     'Approved',
@@ -266,7 +275,7 @@ const InvoiceDetailPage: React.FC = () => {
     'Paid',
     'Overdue',
     'Draft'
-  ];
+  ] as const;
 
   return (
     <ProtectedRoute>
@@ -492,7 +501,7 @@ const InvoiceDetailPage: React.FC = () => {
                           <td className="py-3 px-2">
                             <input
                               type="text"
-                              value={formatCurrency(item.amount, currentInvoice.currency)}
+                              value={isClient ? formatCurrency(item.amount, currentInvoice.currency) : `$${item.amount.toFixed(2)}`}
                               readOnly
                               className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm bg-gray-50"
                             />
@@ -518,7 +527,7 @@ const InvoiceDetailPage: React.FC = () => {
                 <div className="space-y-3 max-w-md ml-auto">
                   <div className="flex justify-between items-center">
                     <span className="text-sm text-gray-600">Subtotal</span>
-                    <span className="text-sm font-medium">{formatCurrency(calculateSubtotal(), currentInvoice.currency)}</span>
+                    <span className="text-sm font-medium">{isClient ? formatCurrency(calculateSubtotal(), currentInvoice.currency) : `$${calculateSubtotal().toFixed(2)}`}</span>
                   </div>
                   <div className="flex justify-between items-center">
                     <span className="text-sm text-gray-600">Tax</span>
@@ -542,7 +551,7 @@ const InvoiceDetailPage: React.FC = () => {
                   </div>
                   <div className="flex justify-between items-center pt-3 border-t border-gray-200">
                     <span className="text-lg font-bold text-gray-900">Total</span>
-                    <span className="text-lg font-bold text-gray-900">{formatCurrency(calculateTotal(), currentInvoice.currency)}</span>
+                    <span className="text-lg font-bold text-gray-900">{isClient ? formatCurrency(calculateTotal(), currentInvoice.currency) : `$${calculateTotal().toFixed(2)}`}</span>
                   </div>
                 </div>
               </div>

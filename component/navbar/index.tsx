@@ -1,5 +1,5 @@
 "use client"
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { LogOut } from 'lucide-react';
 import { useSelector, useDispatch } from 'react-redux';
@@ -12,6 +12,12 @@ const Navbar: React.FC = () => {
   const router = useRouter();
   const dispatch = useDispatch<AppDispatch>();
   const { user, isAuthenticated } = useSelector((state: RootState) => state.auth);
+  const [isMounted, setIsMounted] = useState(false);
+
+  // Track if component is mounted (client-side only)
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
 
   const handleLogout = async () => {
     try {
@@ -24,6 +30,32 @@ const Navbar: React.FC = () => {
       router.push('/login');
     }
   };
+
+  // Don't render until mounted to prevent hydration mismatch
+  if (!isMounted) {
+    // Return a placeholder that matches the navbar structure to avoid layout shift
+    return (
+      <nav className="bg-white border-b border-gray-200 px-6 py-3">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-8 bg-teal-500 rounded-lg flex items-center justify-center">
+              <span className="text-white font-bold text-lg">E</span>
+            </div>
+            <span className="text-gray-900 font-semibold text-lg">EasyScan</span>
+          </div>
+          <div className="flex items-center gap-8">
+            <div className="h-5 w-20 bg-gray-200 rounded animate-pulse"></div>
+            <div className="h-5 w-16 bg-gray-200 rounded animate-pulse"></div>
+            <div className="h-5 w-20 bg-gray-200 rounded animate-pulse"></div>
+          </div>
+          <div className="flex items-center gap-4">
+            <div className="h-8 w-8 bg-gray-200 rounded-full animate-pulse"></div>
+            <div className="h-8 w-16 bg-gray-200 rounded animate-pulse"></div>
+          </div>
+        </div>
+      </nav>
+    );
+  }
 
   // Don't show navbar on login/signup pages
   if (!isAuthenticated) {

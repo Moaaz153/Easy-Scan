@@ -1,5 +1,5 @@
 "use client"
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useSelector, useDispatch } from 'react-redux';
 import { RootState, AppDispatch } from '@/lib/store';
@@ -16,9 +16,20 @@ export default function ProtectedRoute({ children, requireAuth = true }: Protect
   const router = useRouter();
   const dispatch = useDispatch<AppDispatch>();
   const { isAuthenticated: authState, loading, user } = useSelector((state: RootState) => state.auth);
-  const hasToken = isAuthenticated();
+  const [isMounted, setIsMounted] = useState(false);
+  const [hasToken, setHasToken] = useState(false);
+
+  // Only check authentication after component mounts (client-side only)
+  useEffect(() => {
+    setIsMounted(true);
+    if (typeof window !== 'undefined') {
+      setHasToken(isAuthenticated());
+    }
+  }, []);
 
   useEffect(() => {
+    if (!isMounted) return;
+
     const checkAuth = async () => {
       // If we have a token but no user data, fetch it
       if (hasToken && !user && !loading) {
@@ -44,7 +55,16 @@ export default function ProtectedRoute({ children, requireAuth = true }: Protect
     };
 
     checkAuth();
-  }, [hasToken, authState, user, loading, requireAuth, router, dispatch]);
+  }, [isMounted, hasToken, authState, user, loading, requireAuth, router, dispatch]);
+
+  // Don't render anything until mounted to prevent hydration mismatch
+  if (!isMounted) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <Loader2 className="w-8 h-8 text-gray-400 animate-spin" />
+      </div>
+    );
+  }
 
   // Show loading while checking auth
   if (loading || (hasToken && !user && requireAuth)) {
