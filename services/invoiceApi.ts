@@ -8,23 +8,30 @@ import { AxiosResponse } from 'axios';
 // Types matching backend response
 export interface ExtractedFields {
   vendor?: string | null;
+  vendor_address?: string | null;
+  vendor_email?: string | null;
+  vendor_phone?: string | null;
   invoice_number?: string | null;
-  date?: string | null;
+  invoice_date?: string | null;
+  date?: string | null; // Legacy field, maps to invoice_date
   due_date?: string | null;
+  bill_to_name?: string | null;
+  bill_to_address?: string | null;
   total?: number | null;
   subtotal?: number | null;
   tax?: number | null;
+  taxAmount?: number | null;
   discount?: number | null;
   currency?: string;
   items?: Array<{
     description: string;
-    qty: number;
-    rate: number;
-    amount: number;
+    quantity?: number;
+    qty?: number; // Legacy field
+    unitPrice?: number;
+    rate?: number; // Legacy field
+    totalPrice?: number;
+    amount?: number; // Legacy field
   }>;
-  vendor_address?: string | null;
-  vendor_email?: string | null;
-  vendor_phone?: string | null;
   purchase_order?: string | null;
 }
 
@@ -43,11 +50,14 @@ export interface Invoice {
   vendor_address: string | null;
   vendor_email: string | null;
   vendor_phone: string | null;
+  bill_to_name?: string | null;
+  bill_to_address?: string | null;
   invoice_date: string | null;
   due_date: string | null;
   purchase_order: string | null;
   subtotal: number;
   tax: number;
+  tax_amount?: number | null;
   discount: number;
   total: number;
   currency: string;
@@ -71,11 +81,14 @@ export interface InvoiceCreate {
   vendor_address?: string | null;
   vendor_email?: string | null;
   vendor_phone?: string | null;
+  bill_to_name?: string | null;
+  bill_to_address?: string | null;
   invoice_date?: string | null;
   due_date?: string | null;
   purchase_order?: string | null;
   subtotal?: number;
   tax?: number;
+  tax_amount?: number | null;
   discount?: number;
   total: number;
   currency?: string;
@@ -97,11 +110,14 @@ export interface InvoiceUpdate {
   vendor_address?: string | null;
   vendor_email?: string | null;
   vendor_phone?: string | null;
+  bill_to_name?: string | null;
+  bill_to_address?: string | null;
   invoice_date?: string | null;
   due_date?: string | null;
   purchase_order?: string | null;
   subtotal?: number;
   tax?: number;
+  tax_amount?: number | null;
   discount?: number;
   total?: number;
   currency?: string;

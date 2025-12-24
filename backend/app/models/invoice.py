@@ -19,11 +19,14 @@ class Invoice(Base):
     vendor_address = Column(Text, nullable=True)
     vendor_email = Column(String(255), nullable=True)
     vendor_phone = Column(String(50), nullable=True)
+    bill_to_name = Column(String(255), nullable=True)
+    bill_to_address = Column(Text, nullable=True)
     invoice_date = Column(DateTime, nullable=True)
     due_date = Column(DateTime, nullable=True)
     purchase_order = Column(String(100), nullable=True)
     subtotal = Column(Float, default=0.0)
-    tax = Column(Float, default=0.0)
+    tax = Column(Float, default=0.0)  # Keep for backward compatibility
+    tax_amount = Column(Float, default=0.0)  # New field for taxAmount from OCR
     discount = Column(Float, default=0.0)
     total = Column(Float, nullable=False, default=0.0)
     currency = Column(String(10), default="USD")
@@ -45,11 +48,14 @@ class Invoice(Base):
             "vendor_address": self.vendor_address,
             "vendor_email": self.vendor_email,
             "vendor_phone": self.vendor_phone,
+            "bill_to_name": self.bill_to_name,
+            "bill_to_address": self.bill_to_address,
             "invoice_date": self.invoice_date.isoformat() if self.invoice_date else None,
             "due_date": self.due_date.isoformat() if self.due_date else None,
             "purchase_order": self.purchase_order,
             "subtotal": self.subtotal,
             "tax": self.tax,
+            "tax_amount": self.tax_amount if hasattr(self, 'tax_amount') else self.tax,
             "discount": self.discount,
             "total": self.total,
             "currency": self.currency,

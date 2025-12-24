@@ -27,8 +27,8 @@ class DataExtractor:
             # Extract raw text using OCR
             raw_text = OCRService.extract_text(image)
             
-            # Extract structured data
-            extracted_fields = OCRService.extract_structured_data(raw_text)
+            # Extract structured data using layout-based extraction (pass image for position analysis)
+            extracted_fields = OCRService.extract_structured_data(raw_text, image=image)
             
             logger.info(f"Successfully processed invoice image. Extracted {len(raw_text)} characters.")
             

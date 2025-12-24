@@ -91,26 +91,61 @@ const UploadInvoicePage: React.FC = () => {
     const extracted = ocrResult.extracted_fields;
 
     try {
+      // Map OCR items to database format (convert unitPrice/totalPrice to rate/amount for backward compatibility)
+      const mappedItems = extracted.items ? extracted.items.map((item: any) => ({
+        description: item.description || '',
+        qty: item.quantity || item.qty || 1,
+        rate: item.unitPrice || item.rate || 0,
+        amount: item.totalPrice || item.amount || 0,
+      })) : null;
+
+      // Debug: Log extracted fields to verify correct extraction
+      console.log('Extracted fields from OCR:', {
+        invoice_number: extracted.invoice_number,
+        vendor: extracted.vendor,
+        vendor_address: extracted.vendor_address,
+        vendor_email: extracted.vendor_email,
+        vendor_phone: extracted.vendor_phone,
+      });
+
+      // Ensure correct field mapping - validate and clean fields
       const invoiceData = {
-        invoice_number: extracted.invoice_number || null,
-        vendor: extracted.vendor || null,
-        vendor_address: extracted.vendor_address || null,
-        vendor_email: extracted.vendor_email || null,
-        vendor_phone: extracted.vendor_phone || null,
-        invoice_date: extracted.date || null,
+        // Invoice number - must come from invoice_number field only
+        invoice_number: extracted.invoice_number ? String(extracted.invoice_number).trim() : null,
+        // Vendor name - must come from vendor field only (first line at top)
+        vendor: extracted.vendor ? String(extracted.vendor).trim() : null,
+        // Vendor address - must come from vendor_address field only (second line)
+        vendor_address: extracted.vendor_address ? String(extracted.vendor_address).trim() : null,
+        // Vendor email - must come from vendor_email field only (third line)
+        vendor_email: extracted.vendor_email ? String(extracted.vendor_email).trim() : null,
+        // Vendor phone - must come from vendor_phone field only (fourth line)
+        vendor_phone: extracted.vendor_phone ? String(extracted.vendor_phone).trim() : null,
+        bill_to_name: extracted.bill_to_name ? String(extracted.bill_to_name).trim() : null,
+        bill_to_address: extracted.bill_to_address ? String(extracted.bill_to_address).trim() : null,
+        invoice_date: extracted.invoice_date || extracted.date || null,
         due_date: extracted.due_date || null,
-        purchase_order: extracted.purchase_order || null,
+        purchase_order: extracted.purchase_order ? String(extracted.purchase_order).trim() : null,
         subtotal: extracted.subtotal || 0,
-        tax: extracted.tax || 0,
+        tax: extracted.taxAmount || extracted.tax || 0,
+        tax_amount: extracted.taxAmount || extracted.tax || 0,
         discount: extracted.discount || 0,
         total: extracted.total || 0,
         currency: extracted.currency || 'USD',
         status: 'Pending Review',
         raw_text: ocrResult.raw_text,
         extracted_fields: extracted,
-        line_items: extracted.items || null,
+        line_items: mappedItems,
         image_path: (ocrResult as any).image_path || null, // Include image path from OCR result
       };
+
+      // Debug: Log final invoice data to verify mapping
+      console.log('Final invoice data being saved:', {
+        invoice_number: invoiceData.invoice_number,
+        vendor: invoiceData.vendor,
+        vendor_address: invoiceData.vendor_address,
+        vendor_email: invoiceData.vendor_email,
+        vendor_phone: invoiceData.vendor_phone,
+      });
 
       const result = await dispatch(createInvoiceAsync(invoiceData)).unwrap();
       toast.success('Invoice saved successfully!');

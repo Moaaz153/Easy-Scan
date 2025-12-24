@@ -32,12 +32,58 @@ async def lifespan(app: FastAPI):
     # Startup
     logger.info("Starting up application...")
     
+    # Import all models to ensure they're registered with Base
+    try:
+        from app.models.user import User
+        from app.models.invoice import Invoice
+        logger.info("Models imported successfully")
+    except Exception as e:
+        logger.error(f"Error importing models: {str(e)}")
+    
     # Create database tables
     try:
         Base.metadata.create_all(bind=engine)
         logger.info("Database tables created/verified")
+        
+        # Check if tables exist
+        from sqlalchemy import inspect
+        inspector = inspect(engine)
+        tables = inspector.get_table_names()
+        logger.info(f"Database tables: {', '.join(tables)}")
+        
+        # If invoices table exists, check for new columns and add them if missing
+        if 'invoices' in tables:
+            existing_columns = [col['name'] for col in inspector.get_columns('invoices')]
+            missing_columns = []
+            
+            if 'bill_to_name' not in existing_columns:
+                missing_columns.append('bill_to_name')
+            if 'bill_to_address' not in existing_columns:
+                missing_columns.append('bill_to_address')
+            if 'tax_amount' not in existing_columns:
+                missing_columns.append('tax_amount')
+            
+            if missing_columns:
+                logger.info(f"Adding missing columns to invoices table: {', '.join(missing_columns)}")
+                from sqlalchemy import text
+                with engine.begin() as conn:  # Use begin() for automatic transaction management
+                    for col in missing_columns:
+                        try:
+                            if col == 'bill_to_name':
+                                conn.execute(text("ALTER TABLE invoices ADD COLUMN bill_to_name VARCHAR(255)"))
+                            elif col == 'bill_to_address':
+                                conn.execute(text("ALTER TABLE invoices ADD COLUMN bill_to_address TEXT"))
+                            elif col == 'tax_amount':
+                                conn.execute(text("ALTER TABLE invoices ADD COLUMN tax_amount FLOAT DEFAULT 0.0"))
+                            logger.info(f"  ✓ Added column: {col}")
+                        except Exception as e:
+                            error_msg = str(e).lower()
+                            if "duplicate" in error_msg or "already exists" in error_msg or "duplicate column" in error_msg:
+                                logger.info(f"  - Column {col} already exists, skipping...")
+                            else:
+                                logger.warning(f"  Could not add column {col}: {str(e)}")
     except Exception as e:
-        logger.error(f"Error creating database tables: {str(e)}")
+        logger.error(f"Error creating database tables: {str(e)}", exc_info=True)
     
     yield
     

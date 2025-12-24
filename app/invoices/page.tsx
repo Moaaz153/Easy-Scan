@@ -58,16 +58,18 @@ const InvoicesListPage: React.FC = () => {
     }
   };
 
+  // Status colors must match invoice-detailes page
+  // Allowed statuses: Paid, Rejected, Pending Review, Draft
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'Processed':
+      case 'Paid':
         return 'bg-green-100 text-green-700';
       case 'Pending Review':
         return 'bg-yellow-100 text-yellow-700';
-      case 'Error':
+      case 'Rejected':
         return 'bg-red-100 text-red-700';
-      case 'Overdue':
-        return 'bg-orange-100 text-orange-700';
+      case 'Draft':
+        return 'bg-gray-100 text-gray-700';
       default:
         return 'bg-gray-100 text-gray-700';
     }
@@ -104,11 +106,12 @@ const InvoicesListPage: React.FC = () => {
   };
 
   // Calculate stats
+  // Top 4 cards should match statuses in invoice-detailes (Paid, Rejected, Pending Review), excluding Draft
   const stats = {
     total: invoices.length,
-    processed: invoices.filter(inv => inv.status === 'Processed').length,
+    paid: invoices.filter(inv => inv.status === 'Paid').length,
     pending: invoices.filter(inv => inv.status === 'Pending Review').length,
-    errors: invoices.filter(inv => inv.status === 'Error').length,
+    rejected: invoices.filter(inv => inv.status === 'Rejected').length,
   };
 
   return (
@@ -155,12 +158,12 @@ const InvoicesListPage: React.FC = () => {
 
           <div className="bg-white rounded-lg border border-gray-200 p-4 sm:p-6">
             <div className="flex items-center justify-between mb-2">
-              <p className="text-sm text-gray-600">Processed</p>
+              <p className="text-sm text-gray-600">Paid</p>
               <div className="w-8 h-8 bg-green-100 rounded-lg flex items-center justify-center">
                 <CheckCircle className="w-4 h-4 text-green-600" />
               </div>
             </div>
-            <p className="text-2xl sm:text-3xl font-bold text-gray-900">{stats.processed}</p>
+            <p className="text-2xl sm:text-3xl font-bold text-gray-900">{stats.paid}</p>
           </div>
 
           <div className="bg-white rounded-lg border border-gray-200 p-4 sm:p-6">
@@ -175,12 +178,12 @@ const InvoicesListPage: React.FC = () => {
 
           <div className="bg-white rounded-lg border border-gray-200 p-4 sm:p-6">
             <div className="flex items-center justify-between mb-2">
-              <p className="text-sm text-gray-600">Errors</p>
+              <p className="text-sm text-gray-600">Rejected</p>
               <div className="w-8 h-8 bg-red-100 rounded-lg flex items-center justify-center">
                 <AlertCircle className="w-4 h-4 text-red-600" />
               </div>
             </div>
-            <p className="text-2xl sm:text-3xl font-bold text-gray-900">{stats.errors}</p>
+            <p className="text-2xl sm:text-3xl font-bold text-gray-900">{stats.rejected}</p>
           </div>
         </div>
 
@@ -211,10 +214,10 @@ const InvoicesListPage: React.FC = () => {
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
               >
                 <option>All Statuses</option>
-                <option>Processed</option>
+                <option>Paid</option>
                 <option>Pending Review</option>
-                <option>Error</option>
-                <option>Overdue</option>
+                <option>Rejected</option>
+                <option>Draft</option>
               </select>
             </div>
           </div>

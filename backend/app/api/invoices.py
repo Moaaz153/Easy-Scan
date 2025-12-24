@@ -6,7 +6,8 @@ from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 from typing import List, Optional
 import logging
-from datetime import datetime
+from datetime import datetime, timedelta
+from sqlalchemy import func, extract
 import uuid
 import os
 
@@ -29,11 +30,14 @@ class InvoiceCreate(BaseModel):
     vendor_address: Optional[str] = None
     vendor_email: Optional[str] = None
     vendor_phone: Optional[str] = None
+    bill_to_name: Optional[str] = None
+    bill_to_address: Optional[str] = None
     invoice_date: Optional[str] = None
     due_date: Optional[str] = None
     purchase_order: Optional[str] = None
     subtotal: Optional[float] = 0.0
     tax: Optional[float] = 0.0
+    tax_amount: Optional[float] = None  # New field from OCR
     discount: Optional[float] = 0.0
     total: float = 0.0
     currency: Optional[str] = "USD"
@@ -50,11 +54,14 @@ class InvoiceUpdate(BaseModel):
     vendor_address: Optional[str] = None
     vendor_email: Optional[str] = None
     vendor_phone: Optional[str] = None
+    bill_to_name: Optional[str] = None
+    bill_to_address: Optional[str] = None
     invoice_date: Optional[str] = None
     due_date: Optional[str] = None
     purchase_order: Optional[str] = None
     subtotal: Optional[float] = None
     tax: Optional[float] = None
+    tax_amount: Optional[float] = None
     discount: Optional[float] = None
     total: Optional[float] = None
     currency: Optional[str] = None
@@ -69,11 +76,14 @@ class InvoiceResponse(BaseModel):
     vendor_address: Optional[str]
     vendor_email: Optional[str]
     vendor_phone: Optional[str]
+    bill_to_name: Optional[str]
+    bill_to_address: Optional[str]
     invoice_date: Optional[str]
     due_date: Optional[str]
     purchase_order: Optional[str]
     subtotal: float
     tax: float
+    tax_amount: Optional[float] = None
     discount: float
     total: float
     currency: str
@@ -123,11 +133,14 @@ async def create_invoice(
             vendor_address=invoice_data.vendor_address,
             vendor_email=invoice_data.vendor_email,
             vendor_phone=invoice_data.vendor_phone,
+            bill_to_name=invoice_data.bill_to_name,
+            bill_to_address=invoice_data.bill_to_address,
             invoice_date=invoice_date,
             due_date=due_date,
             purchase_order=invoice_data.purchase_order,
             subtotal=invoice_data.subtotal or 0.0,
-            tax=invoice_data.tax or 0.0,
+            tax=invoice_data.tax_amount if invoice_data.tax_amount is not None else (invoice_data.tax or 0.0),
+            tax_amount=invoice_data.tax_amount if invoice_data.tax_amount is not None else (invoice_data.tax or 0.0),
             discount=invoice_data.discount or 0.0,
             total=invoice_data.total,
             currency=invoice_data.currency or "USD",
@@ -196,6 +209,114 @@ async def get_invoices(
         raise HTTPException(
             status_code=500,
             detail=f"Error fetching invoices: {str(e)}"
+        )
+
+
+@router.get("/dashboard/stats")
+async def get_dashboard_stats(
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Get dashboard statistics for the current user
+    Returns: total invoices, pending review count, this month count, total amount
+    """
+    try:
+        # Base query for current user
+        base_query = db.query(Invoice).filter(Invoice.user_id == current_user.id)
+        
+        # Total invoices count
+        total_invoices = base_query.count()
+        
+        # Pending review count
+        pending_count = base_query.filter(Invoice.status == "Pending Review").count()
+        
+        # This month's invoices (current month)
+        now = datetime.now()
+        start_of_month = datetime(now.year, now.month, 1)
+        this_month_count = base_query.filter(Invoice.created_at >= start_of_month).count()
+        
+        # Total amount for current month
+        this_month_total = db.query(func.sum(Invoice.total)).filter(
+            Invoice.user_id == current_user.id,
+            Invoice.created_at >= start_of_month
+        ).scalar() or 0.0
+        
+        # Calculate percentage change from last month
+        last_month_start = (start_of_month - timedelta(days=32)).replace(day=1)
+        last_month_end = start_of_month - timedelta(days=1)
+        last_month_count = base_query.filter(
+            Invoice.created_at >= last_month_start,
+            Invoice.created_at <= last_month_end
+        ).count()
+        
+        month_change = 0
+        if last_month_count > 0:
+            month_change = round(((this_month_count - last_month_count) / last_month_count) * 100, 1)
+        
+        return {
+            "total_invoices": total_invoices,
+            "pending_review": pending_count,
+            "this_month_count": this_month_count,
+            "this_month_total": float(this_month_total),
+            "month_change_percent": month_change
+        }
+    except Exception as e:
+        logger.error(f"Error fetching dashboard stats: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error fetching dashboard statistics: {str(e)}"
+        )
+
+
+@router.get("/dashboard/charts")
+async def get_dashboard_charts(
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Get chart data for dashboard (monthly volume and spend trend for last 12 months)
+    """
+    try:
+        # Get data for last 12 months
+        now = datetime.now()
+        chart_data = []
+        
+        for i in range(11, -1, -1):  # Last 12 months (11 months ago to current month)
+            month_date = (now - timedelta(days=30*i)).replace(day=1)
+            next_month = (month_date + timedelta(days=32)).replace(day=1)
+            
+            month_name = month_date.strftime('%b')
+            
+            # Count invoices for this month
+            invoice_count = db.query(func.count(Invoice.id)).filter(
+                Invoice.user_id == current_user.id,
+                Invoice.created_at >= month_date,
+                Invoice.created_at < next_month
+            ).scalar() or 0
+            
+            # Sum total amount for this month
+            total_amount = db.query(func.sum(Invoice.total)).filter(
+                Invoice.user_id == current_user.id,
+                Invoice.created_at >= month_date,
+                Invoice.created_at < next_month
+            ).scalar() or 0.0
+            
+            chart_data.append({
+                "month": month_name,
+                "volume": invoice_count,
+                "amount": float(total_amount) / 1000.0  # Convert to thousands for display
+            })
+        
+        return {
+            "monthly_volume": chart_data,
+            "monthly_spend": chart_data
+        }
+    except Exception as e:
+        logger.error(f"Error fetching dashboard charts: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error fetching dashboard charts: {str(e)}"
         )
 
 
@@ -328,6 +449,13 @@ async def update_invoice(
         for key, value in list(update_data.items()):
             if value == '' or value is None:
                 update_data[key] = None
+        
+        # Handle tax_amount - map to both tax and tax_amount for backward compatibility
+        if 'tax_amount' in update_data:
+            if update_data['tax_amount'] is not None:
+                update_data['tax'] = update_data['tax_amount']
+            else:
+                update_data['tax'] = None
         
         # Handle date fields - convert string to datetime or None
         if 'invoice_date' in update_data:
